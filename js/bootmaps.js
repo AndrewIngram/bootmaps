@@ -8,7 +8,9 @@ bootmaps.InfoWindow = function(opts) {
       title: "",
       position: new google.maps.LatLng(0, 0),
       closeOnMapClick: true,
-      template: '<div class="popover top map-popover"><div class="arrow"></div><div class="popover-inner"><h3 class="popover-title"></h3><div class="popover-content"></div></div></div>'
+      template: '<div class="popover top map-popover"><div class="arrow"></div><div class="popover-inner"><h3 class="popover-title"></h3><div class="popover-content"></div></div></div>',
+      clearance: new google.maps.Size(10, 10),
+      offset: new google.maps.Size(0, 0)
     };
     var options = $.extend({}, defaults, opts);
 
@@ -20,6 +22,9 @@ bootmaps.InfoWindow = function(opts) {
     this.position_ = options.position;
     this.closeOnMapClick_ = options.closeOnMapClick;
     this.template_ = options.template;
+    this.margin_ = options.margin;
+    this.offset_ = options.offset;
+    this.clearance_ = options.clearance;
 
     this.eventListeners_ = [];
     this.moveListener_ = null;
@@ -53,45 +58,40 @@ bootmaps.InfoWindow.prototype.panBox_ = function() {
 
     map = this.getMap();
 
-    if (map instanceof google.maps.Map) { // Only pan if attached to map, not panorama
+    if (map instanceof google.maps.Map) {
       if (!map.getBounds().contains(this.position_)) {
         map.setCenter(this.position_);
       }
 
-      map.panTo(this.position_);
-
       bounds = map.getBounds();
 
-      var $mapDiv = $(map.getDiv());
-      var mapWidth = $mapDiv.width();
-      var mapHeight = $mapDiv.height();
-
+      var $map = $(map.getDiv());
+      var mapWidth = $map.width();
+      var mapHeight = $map.height();
+      var iwOffsetX = this.offset_.width;
+      var iwOffsetY = this.offset_.height;
       var iwWidth = this.elem_.outerWidth();
       var iwHeight = this.elem_.outerHeight();
-
-      var elemPos = this.elem_.position();
-
-      var iwOffsetX = this.elem_.width;
-      var iwOffsetY = this.elem_.height;
-
-
+      var padX = this.clearance_.width;
+      var padY = this.clearance_.height;
       var pixPosition = this.getProjection().fromLatLngToContainerPixel(this.position_);
 
+      var halfWidth = (iwWidth + padX) / 2;
+      var height = (iwHeight + padX);
 
-      if (pixPosition.x < -elemPos.left) {
-        xOffset = pixPosition.x + elemPos.left;
-      } else if ((pixPosition.x + iwWidth + elemPos.left) > mapWidth) {
-        xOffset = pixPosition.x + iwWidth + elemPos.left - mapWidth;
+      if (pixPosition.x - halfWidth <= 0) {
+        xOffset = -halfWidth;
+      } else if (pixPosition.x + halfWidth >= mapWidth) {
+        xOffset = halfWidth;
       }
 
-      if (pixPosition.y < -elemPos.top) {
-        yOffset = pixPosition.y + elemPos.top;
-      } else if ((pixPosition.y + iwHeight + elemPos.top) > mapHeight) {
-        yOffset = pixPosition.y + iwHeight + elemPos.top - mapHeight;
+      if (pixPosition.y - height <= 0) {
+        yOffset = -height;
+      } else if (pixPosition.y + padY >= mapHeight) {
+        yOffset = padY;
       }
 
       if (!(xOffset === 0 && yOffset === 0)) {
-        var c = map.getCenter();
         map.panBy(xOffset, yOffset);
       }
     }
@@ -99,6 +99,8 @@ bootmaps.InfoWindow.prototype.panBox_ = function() {
 };
 
 bootmaps.InfoWindow.prototype.onAdd = function() {
+    console.log('adding...');
+
     this.elem_ = $(this.template_);
     //.elem_.width('200');
     this.elem_.hide();
@@ -134,6 +136,7 @@ bootmaps.InfoWindow.prototype.onAdd = function() {
 };
 
 bootmaps.InfoWindow.prototype.draw = function() {
+    console.log('drawing');
     var me = this;
 
     var pixPosition = this.getProjection().fromLatLngToDivPixel(this.position_);
@@ -148,7 +151,11 @@ bootmaps.InfoWindow.prototype.draw = function() {
         this.elem_.hide();
     } else {
         this.elem_.show();
+        if (this.div_) {
+          this.panBox_();
+        }
     }
+
 };
 
 bootmaps.InfoWindow.prototype.setContent = function(content) {
@@ -180,7 +187,8 @@ bootmaps.InfoWindow.prototype.getPosition = function () {
   return this.position_;
 };
 
-bootmaps.InfoWindow.prototype.open = function (map, anchor) {
+bootmaps.InfoWindow.prototype.open = function(map, anchor) {
+  console.log('open');
   var me = this;
 
   if (anchor) {
@@ -193,10 +201,6 @@ bootmaps.InfoWindow.prototype.open = function (map, anchor) {
     }
   }
   this.setMap(map);
-
-  if (this.div_) {
-    this.panBox_();
-  }
 
   if (this.closeOnMapClick_) {
     this.eventListeners_.push(google.maps.event.addListener(map, 'click', function(){
