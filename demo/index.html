@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Bootstrap 101 Template</title>
+    <!-- Bootstrap -->
+    <link href="libs/css/bootstrap.min.css" rel="stylesheet" media="screen">
+
+    <style>
+
+    html, body {
+      height: 100%;
+    }
+
+    #map-canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    #map-canvas img {
+      max-width: none;
+    }
+
+    </style>
+  </head>
+  <body>
+      <div id="map-canvas">
+
+      </div>
+
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script src="libs/js/bootstrap.min.js"></script>
+    <script src="../js/bootmaps.js"></script>
+
+    <script>
+      $(document).ready(function() {
+
+        var locations = [
+          {
+            position: new google.maps.LatLng(-31.9530044, 115.8574693),
+            name: 'Perth',
+            content: 'Jack lives here'
+          },
+          {
+            position: new google.maps.LatLng(-37.814107, 144.96328),
+            name: 'Melbourne',
+            content: 'Other people live here'
+          }
+        ];
+
+        var startLocation = new google.maps.LatLng(-25.363882,131.044922);
+        var mapOptions = {
+          zoom: 4,
+          center: startLocation,
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        }
+        var map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
+
+        var infowindow = new bootmaps.InfoWindow({
+          closeOnMapClick: true
+        });
+
+        var createMarker = function(location) {
+          var marker = new google.maps.Marker({
+              position: location.position,
+              map: map,
+              title: location.name
+          });
+          google.maps.event.addListener(marker, 'click', function() {
+            infowindow.setTitle(location.name);
+            infowindow.setContent(location.content);
+            infowindow.open(map, marker);
+          });
+        };
+
+        for (var i = 0; i < locations.length; i++) {
+          createMarker(locations[i]);
+        }
+
+
+
+      });
+    </script> 
+  </body>
+</html>
