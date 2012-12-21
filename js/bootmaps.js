@@ -10,7 +10,7 @@ bootmaps.InfoWindow = function(opts) {
       closeOnMapClick: true,
       template: '<div class="popover top map-popover"><div class="arrow"></div><div class="popover-inner"><h3 class="popover-title"></h3><div class="popover-content"></div></div></div>',
       clearance: new google.maps.Size(10, 10),
-      offset: new google.maps.Size(0, 0)
+      offset: new google.maps.Size(0, -10)
     };
     var options = $.extend({}, defaults, opts);
 
@@ -25,7 +25,7 @@ bootmaps.InfoWindow = function(opts) {
     this.margin_ = options.margin;
     this.offset_ = options.offset;
     this.clearance_ = options.clearance;
-
+    this.opening_ = false;
     this.eventListeners_ = [];
     this.moveListener_ = null;
 };
@@ -68,28 +68,35 @@ bootmaps.InfoWindow.prototype.panBox_ = function() {
       var $map = $(map.getDiv());
       var mapWidth = $map.width();
       var mapHeight = $map.height();
-      var iwOffsetX = this.offset_.width;
-      var iwOffsetY = this.offset_.height;
       var iwWidth = this.elem_.outerWidth();
       var iwHeight = this.elem_.outerHeight();
+
       var padX = this.clearance_.width;
       var padY = this.clearance_.height;
+
       var pixPosition = this.getProjection().fromLatLngToContainerPixel(this.position_);
 
       var halfWidth = (iwWidth + padX) / 2;
-      var height = (iwHeight + padX);
+      var height = (iwHeight + padY) - this.offset_.height;
 
-      if (pixPosition.x - halfWidth <= 0) {
-        xOffset = -halfWidth;
-      } else if (pixPosition.x + halfWidth >= mapWidth) {
-        xOffset = halfWidth;
+      var left = pixPosition.x - halfWidth;
+      var right = pixPosition.x + halfWidth;
+      var top = pixPosition.y - height;
+      var bottom = pixPosition.y + padY;
+
+      if (left <= 0) {
+        xOffset = left;
+      } else if (right >= mapWidth) {
+        xOffset = right - mapWidth;
       }
 
-      if (pixPosition.y - height <= 0) {
-        yOffset = -height;
-      } else if (pixPosition.y + padY >= mapHeight) {
-        yOffset = padY;
+      if (top <= 0) {
+        yOffset = top - padY;
+      } else if (bottom >= mapHeight) {
+        yOffset = bottom - mapHeight;
       }
+
+
 
       if (!(xOffset === 0 && yOffset === 0)) {
         map.panBy(xOffset, yOffset);
@@ -99,12 +106,8 @@ bootmaps.InfoWindow.prototype.panBox_ = function() {
 };
 
 bootmaps.InfoWindow.prototype.onAdd = function() {
-    console.log('adding...');
-
     this.elem_ = $(this.template_);
-    //.elem_.width('200');
     this.elem_.hide();
-    // Set the overlay's div_ property to this DIV
     this.div_ = this.elem_[0];
 
     this.updateContent_();
@@ -136,13 +139,12 @@ bootmaps.InfoWindow.prototype.onAdd = function() {
 };
 
 bootmaps.InfoWindow.prototype.draw = function() {
-    console.log('drawing');
     var me = this;
 
     var pixPosition = this.getProjection().fromLatLngToDivPixel(this.position_);
 
-    var offsetX = this.elem_.outerWidth() / 2;
-    var offsetY = this.elem_.outerHeight() + 10;
+    var offsetX = (this.elem_.outerWidth() / 2) + this.offset_.width;
+    var offsetY = this.elem_.outerHeight() - this.offset_.height;
 
     this.elem_.css('left', (pixPosition.x - offsetX) + "px");
     this.elem_.css('top', (pixPosition.y - offsetY) + "px");
@@ -151,8 +153,9 @@ bootmaps.InfoWindow.prototype.draw = function() {
         this.elem_.hide();
     } else {
         this.elem_.show();
-        if (this.div_) {
+        if (this.div_ && this.opening_) {
           this.panBox_();
+          this.opening_ = false;
         }
     }
 
@@ -188,8 +191,8 @@ bootmaps.InfoWindow.prototype.getPosition = function () {
 };
 
 bootmaps.InfoWindow.prototype.open = function(map, anchor) {
-  console.log('open');
   var me = this;
+  this.opening_ = true;
 
   if (anchor) {
     if (this.getPosition() !== anchor.getPosition()) {
