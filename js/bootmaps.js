@@ -9,12 +9,16 @@ bootmaps.InfoWindow = function(opts) {
       position: new google.maps.LatLng(0, 0),
       closeOnMapClick: true,
       template: '<div class="popover top map-popover"><div class="arrow"></div><div class="popover-inner"><h3 class="popover-title"></h3><div class="popover-content"></div></div></div>',
-      clearance: new google.maps.Size(10, 10),
-      offset: new google.maps.Size(0, -10)
+      offset: new google.maps.Size(0, -10),
+      showDebugOverlays: false,
+      maxHeight: 250
     };
     var options = $.extend({}, defaults, opts);
 
     google.maps.OverlayView.apply(this, arguments);
+
+    this.options = options;
+
     this.map_ = options.map;
     this.content_ = options.content;
     this.disableAutoPan_ = options.disableAutoPan;
@@ -24,10 +28,14 @@ bootmaps.InfoWindow = function(opts) {
     this.template_ = options.template;
     this.margin_ = options.margin;
     this.offset_ = options.offset;
-    this.clearance_ = options.clearance;
     this.opening_ = false;
     this.eventListeners_ = [];
     this.moveListener_ = null;
+    this.maxHeight_ = options.maxHeight;
+
+    if (options.showDebugOverlays) {
+      this.rectangle = new google.maps.Rectangle();
+    }
 };
 
 bootmaps.InfoWindow.prototype = new google.maps.OverlayView();
@@ -46,61 +54,59 @@ bootmaps.InfoWindow.prototype.updateTitle_ = function() {
 bootmaps.InfoWindow.prototype.updateContent_ = function() {
     if (this.elem_) {
       this.elem_.find('.popover-content').html(this.content_);
+      this.elem_.find('.popover-content').css('overflow', 'auto');
+      this.elem_.find('.popover-content').css('maxHeight', this.maxHeight_ + 'px');
     }
 };
 
 bootmaps.InfoWindow.prototype.panBox_ = function() {
-  var map;
-  var bounds;
-  var xOffset = 0, yOffset = 0;
-
   if (!this.disableAutoPan_) {
 
-    map = this.getMap();
+    var map = this.getMap();
 
     if (map instanceof google.maps.Map) {
-      if (!map.getBounds().contains(this.position_)) {
-        map.setCenter(this.position_);
-      }
-
-      bounds = map.getBounds();
-
       var $map = $(map.getDiv());
+      var center = map.getCenter();
       var mapWidth = $map.width();
       var mapHeight = $map.height();
       var iwWidth = this.elem_.outerWidth();
       var iwHeight = this.elem_.outerHeight();
 
-      var padX = this.clearance_.width;
-      var padY = this.clearance_.height;
-
       var pixPosition = this.getProjection().fromLatLngToContainerPixel(this.position_);
 
-      var halfWidth = (iwWidth + padX) / 2;
-      var height = (iwHeight + padY) - this.offset_.height;
+      var halfWidth = iwWidth / 2;
 
-      var left = pixPosition.x - halfWidth;
-      var right = pixPosition.x + halfWidth;
-      var top = pixPosition.y - height;
-      var bottom = pixPosition.y + padY;
+      var markerEdges = {
+        top: (pixPosition.y - iwHeight) + this.offset_.height,
+        left: (pixPosition.x - halfWidth) + this.offset_.width,
+        bottom: pixPosition.y,
+        right: (pixPosition.x + halfWidth) + this.offset_.width
+      };
 
-      if (left <= 0) {
-        xOffset = left;
-      } else if (right >= mapWidth) {
-        xOffset = right - mapWidth;
+      var ne = this.getProjection().fromContainerPixelToLatLng(
+        new google.maps.Point(markerEdges.left, markerEdges.top), true
+      );
+
+      var sw = this.getProjection().fromContainerPixelToLatLng(
+        new google.maps.Point(markerEdges.right, markerEdges.bottom), true
+      );
+
+      var bounds = new google.maps.LatLngBounds(ne, sw);
+
+      if (this.options.showDebugOverlays) {
+        var rectOptions = {
+          strokeColor: "#FF0000",
+          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          fillColor: "#FF0000",
+          fillOpacity: 0.35,
+          map: map,
+          bounds: bounds
+        };
+        this.rectangle.setOptions(rectOptions);
       }
 
-      if (top <= 0) {
-        yOffset = top - padY;
-      } else if (bottom >= mapHeight) {
-        yOffset = bottom - mapHeight;
-      }
-
-
-
-      if (!(xOffset === 0 && yOffset === 0)) {
-        map.panBy(xOffset, yOffset);
-      }
+      map.panToBounds(bounds);
     }
   }
 };
@@ -110,8 +116,8 @@ bootmaps.InfoWindow.prototype.onAdd = function() {
     this.elem_.hide();
     this.div_ = this.elem_[0];
 
-    this.updateContent_();
     this.updateTitle_();
+    this.updateContent_();
 
     var cancelHandler = function (e) {
       e.cancelBubble = true;
