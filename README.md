@@ -1,4 +1,4 @@
 bootmaps
 ========
 
-Map markers and infoWindows for Bootstrap
+Custom infoWindow for Bootstrap
